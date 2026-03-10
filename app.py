@@ -1,6 +1,6 @@
 """
 app.py
-FastAPI REST API that exposes the precipitation data stored in MySQL.
+FastAPI REST API that exposes IPS Habilitadas data stored in MySQL.
 
 Interactive docs are available at:
     http://localhost:5000/docs   (Swagger UI)
@@ -11,23 +11,27 @@ Endpoints
 GET /health
     Simple health-check.
 
-GET /precipitaciones
+GET /ips
     Query parameters:
         departamento  – filter by department name (case-insensitive, partial match)
         municipio     – filter by municipality name (case-insensitive, partial match)
-        fecha_inicio  – include records on or after this date (YYYY-MM-DD)
-        fecha_fin     – include records on or before this date (YYYY-MM-DD)
+        habilitado    – filter by enabled status (SI / NO)
+        clpr_nombre   – filter by provider class (partial match)
+        naju_nombre   – filter by legal nature (Pública / Privada)
         limit         – max rows to return (1–1000, default 100)
         offset        – pagination offset (default 0)
 
-GET /precipitaciones/{id}
-    Return a single record by its primary key.
+GET /ips/{id}
+    Return a single IPS record by its primary key.
 
 GET /estadisticas
-    Aggregate statistics (count, avg, max, min precipitation) per department.
+    Count of IPS per department, ordered by total descending.
 
 GET /departamentos
     Sorted list of all distinct departments in the table.
+
+GET /clases
+    Sorted list of all distinct provider classes (clpr_nombre).
 
 Usage:
     python app.py
@@ -38,7 +42,6 @@ Usage:
 from __future__ import annotations
 
 from typing import Optional
-from datetime import date
 
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
@@ -48,46 +51,53 @@ import config
 import database
 
 app = FastAPI(
-    title="API Precipitaciones – datos.gov.co",
+    title="API IPS Habilitadas – datos.gov.co",
     description=(
-        "API REST para consultar registros de precipitaciones obtenidos del portal "
-        "de datos abiertos del gobierno colombiano (dataset ksew-j3zj)."
+        "API REST para consultar Instituciones Prestadoras de Salud (IPS) habilitadas "
+        "obtenidas del portal de datos abiertos del gobierno colombiano (dataset ugc5-acjp)."
     ),
     version="1.0.0",
 )
 
 
 # ---------------------------------------------------------------------------
-# Pydantic response models (improve /docs readability and type safety)
+# Pydantic response models
 # ---------------------------------------------------------------------------
 
-class Precipitacion(BaseModel):
+class IPS(BaseModel):
     id: int
-    codigo_estacion: Optional[str]
-    nombre_estacion: Optional[str]
+    codigo_habilitacion: Optional[str]
+    nombre_prestador: Optional[str]
+    nit: Optional[str]
+    razon_social: Optional[str]
+    clpr_codigo: Optional[str]
+    clpr_nombre: Optional[str]
     departamento: Optional[str]
     municipio: Optional[str]
-    fecha: Optional[str]
-    valor_mm: Optional[float]
-    latitud: Optional[float]
-    longitud: Optional[float]
-    altitud: Optional[float]
+    ese: Optional[str]
+    direccion: Optional[str]
+    telefono: Optional[str]
+    email: Optional[str]
+    gerente: Optional[str]
+    nivel: Optional[str]
+    caracter: Optional[str]
+    habilitado: Optional[str]
+    fecha_radicacion: Optional[str]
+    fecha_vencimiento: Optional[str]
+    naju_nombre: Optional[str]
     created_at: Optional[str]
 
 
-class PrecipitacionesResponse(BaseModel):
+class IPSResponse(BaseModel):
     total: int
     limit: int
     offset: int
-    data: list[Precipitacion]
+    data: list[IPS]
 
 
 class EstadisticaDepartamento(BaseModel):
     departamento: Optional[str]
-    total_registros: int
-    promedio_mm: Optional[float]
-    max_mm: Optional[float]
-    min_mm: Optional[float]
+    total_ips: int
 
 
 class EstadisticasResponse(BaseModel):
@@ -96,6 +106,10 @@ class EstadisticasResponse(BaseModel):
 
 class DepartamentosResponse(BaseModel):
     departamentos: list[str]
+
+
+class ClasesResponse(BaseModel):
+    clases: list[str]
 
 
 class HealthResponse(BaseModel):
@@ -125,18 +139,17 @@ def health():
     return {"status": "ok"}
 
 
-@app.get("/precipitaciones", response_model=PrecipitacionesResponse, tags=["Precipitaciones"])
-def get_precipitaciones(
+@app.get("/ips", response_model=IPSResponse, tags=["IPS"])
+def get_ips(
     departamento: Optional[str] = Query(None, description="Filtrar por departamento (coincidencia parcial)"),
     municipio: Optional[str]    = Query(None, description="Filtrar por municipio (coincidencia parcial)"),
-    fecha_inicio: Optional[date] = Query(None, description="Fecha mínima del registro (YYYY-MM-DD)"),
-    fecha_fin: Optional[date]    = Query(None, description="Fecha máxima del registro (YYYY-MM-DD)"),
+    habilitado: Optional[str]   = Query(None, description="Filtrar por estado (SI / NO)"),
+    clpr_nombre: Optional[str]  = Query(None, description="Filtrar por clase de prestador (coincidencia parcial)"),
+    naju_nombre: Optional[str]  = Query(None, description="Filtrar por naturaleza jurídica (Pública / Privada)"),
     limit: int  = Query(100, ge=1, le=1000, description="Número máximo de registros a retornar"),
     offset: int = Query(0,   ge=0,          description="Desplazamiento para paginación"),
 ):
-    """
-    Retorna registros de precipitaciones con filtros opcionales y paginación.
-    """
+    """Retorna registros de IPS habilitadas con filtros opcionales y paginación."""
     where_clauses: list[str] = []
     params: list = []
 
@@ -146,22 +159,27 @@ def get_precipitaciones(
     if municipio:
         where_clauses.append("LOWER(municipio) LIKE %s")
         params.append(f"%{municipio.lower()}%")
-    if fecha_inicio:
-        where_clauses.append("fecha >= %s")
-        params.append(str(fecha_inicio))
-    if fecha_fin:
-        where_clauses.append("fecha <= %s")
-        params.append(str(fecha_fin))
+    if habilitado:
+        where_clauses.append("UPPER(habilitado) = %s")
+        params.append(habilitado.upper())
+    if clpr_nombre:
+        where_clauses.append("LOWER(clpr_nombre) LIKE %s")
+        params.append(f"%{clpr_nombre.lower()}%")
+    if naju_nombre:
+        where_clauses.append("LOWER(naju_nombre) LIKE %s")
+        params.append(f"%{naju_nombre.lower()}%")
 
     where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
-    count_sql = f"SELECT COUNT(*) FROM precipitaciones {where_sql}"
+    count_sql = f"SELECT COUNT(*) FROM ips {where_sql}"
     page_sql = f"""
-        SELECT id, codigo_estacion, nombre_estacion, departamento, municipio,
-               fecha, valor_mm, latitud, longitud, altitud, created_at
-        FROM precipitaciones
+        SELECT id, codigo_habilitacion, nombre_prestador, nit, razon_social,
+               clpr_codigo, clpr_nombre, departamento, municipio, ese,
+               direccion, telefono, email, gerente, nivel, caracter,
+               habilitado, fecha_radicacion, fecha_vencimiento, naju_nombre, created_at
+        FROM ips
         {where_sql}
-        ORDER BY fecha DESC, id DESC
+        ORDER BY departamento, nombre_prestador
         LIMIT %s OFFSET %s
     """
 
@@ -180,18 +198,18 @@ def get_precipitaciones(
     return {"total": total, "limit": limit, "offset": offset, "data": rows}
 
 
-@app.get("/precipitaciones/{record_id}", response_model=Precipitacion, tags=["Precipitaciones"])
-def get_precipitacion(record_id: int):
-    """
-    Retorna un único registro de precipitación por su ID.
-    """
+@app.get("/ips/{record_id}", response_model=IPS, tags=["IPS"])
+def get_ips_by_id(record_id: int):
+    """Retorna un único registro de IPS por su ID."""
     conn = database.get_connection()
     cursor = conn.cursor()
     cursor.execute(
         """
-        SELECT id, codigo_estacion, nombre_estacion, departamento, municipio,
-               fecha, valor_mm, latitud, longitud, altitud, created_at
-        FROM precipitaciones
+        SELECT id, codigo_habilitacion, nombre_prestador, nit, razon_social,
+               clpr_codigo, clpr_nombre, departamento, municipio, ese,
+               direccion, telefono, email, gerente, nivel, caracter,
+               habilitado, fecha_radicacion, fecha_vencimiento, naju_nombre, created_at
+        FROM ips
         WHERE id = %s
         """,
         (record_id,),
@@ -209,24 +227,16 @@ def get_precipitacion(record_id: int):
 
 @app.get("/estadisticas", response_model=EstadisticasResponse, tags=["Estadísticas"])
 def get_estadisticas():
-    """
-    Retorna estadísticas agregadas de precipitación (conteo, promedio, máx, mín)
-    agrupadas por departamento.
-    """
+    """Retorna el conteo de IPS habilitadas agrupadas por departamento."""
     conn = database.get_connection()
     cursor = conn.cursor()
     cursor.execute(
         """
-        SELECT
-            departamento,
-            COUNT(*)                AS total_registros,
-            ROUND(AVG(valor_mm), 2) AS promedio_mm,
-            MAX(valor_mm)           AS max_mm,
-            MIN(valor_mm)           AS min_mm
-        FROM precipitaciones
-        WHERE valor_mm IS NOT NULL
+        SELECT departamento, COUNT(*) AS total_ips
+        FROM ips
+        WHERE departamento IS NOT NULL
         GROUP BY departamento
-        ORDER BY promedio_mm DESC
+        ORDER BY total_ips DESC
         """
     )
     rows = _rows_to_dicts(cursor)
@@ -237,19 +247,32 @@ def get_estadisticas():
 
 @app.get("/departamentos", response_model=DepartamentosResponse, tags=["General"])
 def get_departamentos():
-    """
-    Retorna la lista de departamentos distintos presentes en la tabla.
-    """
+    """Retorna la lista de departamentos distintos presentes en la tabla."""
     conn = database.get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT DISTINCT departamento FROM precipitaciones "
+        "SELECT DISTINCT departamento FROM ips "
         "WHERE departamento IS NOT NULL ORDER BY departamento"
     )
     departments = [r[0] for r in cursor.fetchall()]
     cursor.close()
     conn.close()
     return {"departamentos": departments}
+
+
+@app.get("/clases", response_model=ClasesResponse, tags=["General"])
+def get_clases():
+    """Retorna la lista de clases de prestador distintas (clpr_nombre)."""
+    conn = database.get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT DISTINCT clpr_nombre FROM ips "
+        "WHERE clpr_nombre IS NOT NULL ORDER BY clpr_nombre"
+    )
+    clases = [r[0] for r in cursor.fetchall()]
+    cursor.close()
+    conn.close()
+    return {"clases": clases}
 
 
 # ---------------------------------------------------------------------------

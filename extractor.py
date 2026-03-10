@@ -1,7 +1,7 @@
 """
 extractor.py
-Fetches precipitation data from datos.gov.co (dataset ksew-j3zj),
-processes it with pandas, and stores the results in MySQL.
+Fetches IPS (Instituciones Prestadoras de Salud) data from datos.gov.co
+(dataset ugc5-acjp), processes it with pandas, and stores the results in MySQL.
 
 Usage:
     python extractor.py [--truncate]
@@ -20,23 +20,30 @@ import database
 # ---------------------------------------------------------------------------
 
 def _safe_date(value):
-    """Return a 'YYYY-MM-DD' string or None from an ISO-8601 timestamp."""
+    """
+    Return a 'YYYY-MM-DD' string or None.
+    Handles both numeric strings like '20030409' and ISO-8601 timestamps.
+    """
     if not value:
         return None
     try:
-        return pd.to_datetime(value).strftime("%Y-%m-%d")
+        s = str(value).strip()
+        # Numeric format YYYYMMDD
+        if s.isdigit() and len(s) == 8:
+            return f"{s[:4]}-{s[4:6]}-{s[6:8]}"
+        return pd.to_datetime(s).strftime("%Y-%m-%d")
     except Exception:
         return None
 
 
-def _safe_decimal(value):
-    """Return a float or None from an arbitrary string."""
+def _safe_str(value, max_len=None):
+    """Return a stripped string or None; optionally truncate to max_len."""
     if value is None:
         return None
-    try:
-        return float(str(value).replace(",", ".").strip())
-    except (ValueError, TypeError):
+    s = str(value).strip()
+    if s in ("", "nan", "NaT", "None"):
         return None
+    return s[:max_len] if max_len else s
 
 
 # ---------------------------------------------------------------------------
@@ -48,8 +55,7 @@ def fetch_data(url: str = config.API_URL, limit: int = config.API_LIMIT) -> list
     Download up to *limit* records from the Socrata-based API.
     Raises an exception if the HTTP request fails.
     """
-    params = {"$limit": limit}
-    response = requests.get(url, params=params, timeout=config.API_TIMEOUT)
+    response = requests.get(url, params={"$limit": limit}, timeout=config.API_TIMEOUT)
     response.raise_for_status()
     return response.json()
 
@@ -61,82 +67,50 @@ def fetch_data(url: str = config.API_URL, limit: int = config.API_LIMIT) -> list
 def process_data(raw_records: list[dict]) -> pd.DataFrame:
     """
     Convert the raw list of dictionaries into a cleaned pandas DataFrame.
-    Column names are normalised and obvious data-type conversions are applied.
     """
     if not raw_records:
         return pd.DataFrame()
 
     df = pd.DataFrame(raw_records)
-
-    # Lower-case all column names and replace spaces with underscores
     df.columns = [c.lower().replace(" ", "_") for c in df.columns]
-
-    # Attempt to cast numeric columns
-    numeric_candidates = [
-        "valor",
-        "valorobservado",
-        "valor_observado",
-        "latitud",
-        "longitud",
-        "altitud",
-    ]
-    for col in numeric_candidates:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-
-    # Attempt to parse date columns
-    date_candidates = ["fecha", "fechaobservacion", "fecha_observacion"]
-    for col in date_candidates:
-        if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors="coerce")
-
     return df
 
 
 def build_db_records(df: pd.DataFrame) -> list[dict]:
     """
     Map a processed DataFrame to the list of dicts expected by
-    database.insert_records().  Unknown fields are preserved in *raw_json*.
+    database.insert_records().
     """
     records = []
-
-    # Column-name aliases: target field → list of possible source columns
-    col_map = {
-        "codigo_estacion":  ["codigoestacion", "codigo_estacion", "cod_estacion"],
-        "nombre_estacion":  ["nombreestacion", "nombre_estacion", "estacion"],
-        "departamento":     ["departamento", "nombredepto", "depto"],
-        "municipio":        ["municipio", "nombremunicipio", "ciudad"],
-        "fecha":            ["fecha", "fechaobservacion", "fecha_observacion"],
-        "valor_mm":         ["valor", "valorobservado", "valor_observado", "precipitacion_mm"],
-        "latitud":          ["latitud", "lat"],
-        "longitud":         ["longitud", "lon", "lng"],
-        "altitud":          ["altitud", "elevacion", "altura"],
-    }
-
-    def _pick(row, aliases):
-        for alias in aliases:
-            val = row.get(alias)
-            if val is not None and str(val).strip() not in ("", "nan", "NaT"):
-                return str(val).strip()
-        return None
 
     for _, row in df.iterrows():
         row_dict = row.where(pd.notna(row), other=None).to_dict()
 
-        record = {target: _pick(row_dict, aliases) for target, aliases in col_map.items()}
-
-        # Type coercions for MySQL
-        record["valor_mm"] = _safe_decimal(record["valor_mm"])
-        record["latitud"]  = _safe_decimal(record["latitud"])
-        record["longitud"] = _safe_decimal(record["longitud"])
-        record["altitud"]  = _safe_decimal(record["altitud"])
-        record["fecha"]    = _safe_date(record["fecha"])
-
-        # Store the full original row as JSON for reference
-        record["raw_json"] = json.dumps(
-            {k: str(v) if v is not None else None for k, v in row_dict.items()},
-            ensure_ascii=False,
-        )
+        record = {
+            "codigo_habilitacion": _safe_str(row_dict.get("codigo_habilitacion"), 50),
+            "nombre_prestador":    _safe_str(row_dict.get("nombre_prestador"), 400),
+            "nit":                 _safe_str(row_dict.get("nits_nit"), 50),
+            "razon_social":        _safe_str(row_dict.get("razon_social"), 400),
+            "clpr_codigo":         _safe_str(row_dict.get("clpr_codigo"), 10),
+            "clpr_nombre":         _safe_str(row_dict.get("clpr_nombre"), 200),
+            "departamento":        _safe_str(row_dict.get("depa_nombre"), 200),
+            "municipio":           _safe_str(row_dict.get("muni_nombre"), 200),
+            "ese":                 _safe_str(row_dict.get("ese"), 10),
+            "direccion":           _safe_str(row_dict.get("direccion"), 400),
+            "telefono":            _safe_str(row_dict.get("telefono"), 200),
+            "email":               _safe_str(row_dict.get("email"), 300),
+            "gerente":             _safe_str(row_dict.get("gerente"), 300),
+            "nivel":               _safe_str(row_dict.get("nivel"), 50),
+            "caracter":            _safe_str(row_dict.get("caracter"), 100),
+            "habilitado":          _safe_str(row_dict.get("habilitado"), 10),
+            "fecha_radicacion":    _safe_date(row_dict.get("fecha_radicacion")),
+            "fecha_vencimiento":   _safe_date(row_dict.get("fecha_vencimiento")),
+            "naju_nombre":         _safe_str(row_dict.get("naju_nombre"), 100),
+            "raw_json": json.dumps(
+                {k: str(v) if v is not None else None for k, v in row_dict.items()},
+                ensure_ascii=False,
+            ),
+        }
 
         records.append(record)
 
@@ -156,7 +130,7 @@ def run(truncate: bool = False):
     4. Optionally truncate existing rows.
     5. Insert into MySQL.
     """
-    print("=== API-gobierno – Extractor de Precipitaciones ===")
+    print("=== API-gobierno – Extractor de IPS Habilitadas ===")
 
     # -- Setup DB ---------------------------------------------------------
     print("[1/4] Asegurando que la base de datos y la tabla existen …")
@@ -173,6 +147,7 @@ def run(truncate: bool = False):
     print("[3/4] Procesando datos con pandas …")
     df = process_data(raw)
     print(f"      DataFrame: {df.shape[0]} filas × {df.shape[1]} columnas.")
+    print(f"      Columnas: {list(df.columns)}")
     db_records = build_db_records(df)
 
     # -- Store ------------------------------------------------------------
@@ -181,7 +156,7 @@ def run(truncate: bool = False):
         database.truncate_table(conn)
         print("      Filas anteriores eliminadas (truncate=True).")
     inserted = database.insert_records(conn, db_records)
-    print(f"      {inserted} filas insertadas en '{config.DB_NAME}.precipitaciones'.")
+    print(f"      {inserted} filas insertadas en '{config.DB_NAME}.ips'.")
 
     conn.close()
     print("Listo.")
@@ -191,12 +166,12 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Descarga y almacena datos de precipitaciones de datos.gov.co."
+        description="Descarga y almacena datos de IPS Habilitadas de datos.gov.co."
     )
     parser.add_argument(
         "--truncate",
         action="store_true",
-        help="Vacía la tabla precipitaciones antes de insertar nuevos datos.",
+        help="Vacía la tabla ips antes de insertar nuevos datos.",
     )
     args = parser.parse_args()
     run(truncate=args.truncate)
