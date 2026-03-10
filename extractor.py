@@ -75,6 +75,7 @@ def process_data(raw_records: list[dict]) -> pd.DataFrame:
     numeric_candidates = [
         "valor",
         "valorobservado",
+        "valor_observado",
         "latitud",
         "longitud",
         "altitud",
@@ -106,7 +107,7 @@ def build_db_records(df: pd.DataFrame) -> list[dict]:
         "departamento":     ["departamento", "nombredepto", "depto"],
         "municipio":        ["municipio", "nombremunicipio", "ciudad"],
         "fecha":            ["fecha", "fechaobservacion", "fecha_observacion"],
-        "valor_mm":         ["valor", "valorobservado", "precipitacion_mm"],
+        "valor_mm":         ["valor", "valorobservado", "valor_observado", "precipitacion_mm"],
         "latitud":          ["latitud", "lat"],
         "longitud":         ["longitud", "lon", "lng"],
         "altitud":          ["altitud", "elevacion", "altura"],
