@@ -1,48 +1,51 @@
 import { Link } from 'react-router-dom';
-import { CloudRain, Database, BarChart3, Search, ArrowRight, Zap, Shield, Globe } from 'lucide-react';
+import { Hospital, Database, BarChart3, Search, ArrowRight, Zap, Shield, Globe } from 'lucide-react';
 
 const features = [
   {
     icon: Database,
     title: 'Datos Abiertos',
-    desc: 'Accede a registros de precipitaciones del portal datos.gov.co del gobierno colombiano.',
+    desc: 'Accede al registro de prestadores de servicios de salud (REPS) del portal datos.gov.co.',
   },
   {
     icon: Zap,
-    title: 'API REST Rápida',
-    desc: 'Endpoints optimizados con FastAPI, filtros flexibles y paginación integrada.',
+    title: 'Consulta Directa',
+    desc: 'Conecta directamente con la API Socrata de datos.gov.co con filtros y paginación.',
   },
   {
     icon: BarChart3,
     title: 'Estadísticas en Tiempo Real',
-    desc: 'Visualiza promedios, máximos y mínimos por departamento con gráficas interactivas.',
+    desc: 'Visualiza distribución de prestadores por departamento, clase y naturaleza jurídica.',
   },
   {
     icon: Search,
     title: 'Explorador de Datos',
-    desc: 'Busca y filtra registros por departamento, municipio y rango de fechas.',
+    desc: 'Busca y filtra prestadores por departamento, municipio, nombre y naturaleza.',
   },
   {
     icon: Shield,
     title: 'Datos Confiables',
-    desc: 'Información verificada proveniente del portal oficial de datos del gobierno.',
+    desc: 'Información verificada del Registro Especial de Prestadores de Servicios de Salud (REPS).',
   },
   {
     icon: Globe,
     title: 'Cobertura Nacional',
-    desc: 'Estaciones de medición en múltiples departamentos y municipios de Colombia.',
+    desc: 'Prestadores habilitados en todos los departamentos y municipios de Colombia.',
   },
 ];
 
-const codeExample = `// Consultar precipitaciones por departamento
+const codeExample = `// Consultar prestadores por departamento
 const response = await fetch(
-  '/precipitaciones?departamento=antioquia&limit=10'
+  'https://www.datos.gov.co/resource/ugc5-acjp.json'
+  + '?$where=depa_nombre=\\'ANTIOQUIA\\'&$limit=10'
 );
-const { data, total } = await response.json();
+const data = await response.json();
 
-// Obtener estadísticas agregadas
-const stats = await fetch('/estadisticas');
-const { data: departamentos } = await stats.json();`;
+// Obtener estadísticas por departamento
+const stats = await fetch(
+  'https://www.datos.gov.co/resource/ugc5-acjp.json'
+  + '?$select=depa_nombre,count(*)&$group=depa_nombre'
+);`;
 
 export default function Home() {
   return (
@@ -59,20 +62,20 @@ export default function Home() {
           <div className="mx-auto max-w-3xl text-center">
             {/* Badge */}
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary-500/20 bg-primary-500/10 px-4 py-1.5 text-sm text-primary-300">
-              <CloudRain className="h-4 w-4" />
+              <Hospital className="h-4 w-4" />
               Datos Abiertos de Colombia
             </div>
 
             <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl">
-              API de{' '}
+              Prestadores de{' '}
               <span className="bg-gradient-to-r from-primary-400 to-primary-200 bg-clip-text text-transparent">
-                Precipitaciones
+                Salud
               </span>
             </h1>
 
             <p className="mx-auto mt-6 max-w-2xl text-lg text-surface-400 sm:text-xl">
-              Consulta, filtra y visualiza datos de precipitaciones del portal de datos abiertos del
-              gobierno colombiano. API REST con FastAPI, paginación y estadísticas.
+              Consulta, filtra y visualiza el Registro Especial de Prestadores de Servicios de Salud
+              (REPS) del portal de datos abiertos del gobierno colombiano.
             </p>
 
             {/* CTAs */}
@@ -115,10 +118,10 @@ export default function Home() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold text-white sm:text-4xl">
-              Todo lo que necesitas para trabajar con datos de precipitaciones
+              Todo lo que necesitas para explorar prestadores de salud
             </h2>
             <p className="mt-4 text-lg text-surface-400">
-              Una API completa con filtros, paginación, estadísticas y visualización de datos.
+              Consulta directa al REPS con filtros, paginación, estadísticas y visualización.
             </p>
           </div>
 
@@ -151,11 +154,10 @@ export default function Home() {
 
           <div className="mx-auto mt-12 max-w-3xl space-y-4">
             {[
-              { method: 'GET', path: '/precipitaciones', desc: 'Consultar registros con filtros y paginación' },
-              { method: 'GET', path: '/precipitaciones/{id}', desc: 'Obtener un registro por ID' },
-              { method: 'GET', path: '/estadisticas', desc: 'Estadísticas agregadas por departamento' },
-              { method: 'GET', path: '/departamentos', desc: 'Lista de todos los departamentos' },
-              { method: 'GET', path: '/health', desc: 'Estado de la API' },
+              { method: 'GET', path: '?$limit=25&$offset=0', desc: 'Consultar prestadores con paginación' },
+              { method: 'GET', path: '?$where=depa_nombre=\'...\'' , desc: 'Filtrar por departamento' },
+              { method: 'GET', path: '?$select=...&$group=...', desc: 'Estadísticas agregadas' },
+              { method: 'GET', path: '?$select=depa_nombre&$group=depa_nombre', desc: 'Departamentos únicos' },
             ].map((ep) => (
               <div
                 key={ep.path}
@@ -179,7 +181,7 @@ export default function Home() {
             Comienza a explorar los datos
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-lg text-surface-400">
-            Visualiza estadísticas, filtra registros y descubre patrones en los datos de precipitaciones de Colombia.
+            Visualiza estadísticas, filtra prestadores y descubre la distribución de servicios de salud en Colombia.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
@@ -189,14 +191,12 @@ export default function Home() {
               Ir al Dashboard
               <ArrowRight className="h-4 w-4" />
             </Link>
-            <a
-              href="/api/docs"
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              to="/docs"
               className="inline-flex items-center gap-2 rounded-xl border border-surface-700 px-6 py-3 font-medium text-surface-300 no-underline transition-colors hover:border-surface-600 hover:text-white"
             >
-              Documentación Swagger
-            </a>
+              Documentación
+            </Link>
           </div>
         </div>
       </section>

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, TrendingDown, Droplets, MapPin } from 'lucide-react';
+import { BarChart3, Building2, MapPin, Scale } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import { getEstadisticas, getDepartamentos } from '../services/api';
+import { getEstadisticasPorDepto, getEstadisticasPorClase, getEstadisticasPorNaturaleza, getTotalPrestadores } from '../services/api';
 import StatCard from '../components/StatCard';
 import Loader from '../components/Loader';
 import ErrorMessage from '../components/ErrorMessage';
@@ -16,18 +16,27 @@ const CHART_COLORS = [
 ];
 
 export default function Dashboard() {
-  const [stats, setStats] = useState(null);
-  const [deptos, setDeptos] = useState(null);
+  const [porDepto, setPorDepto] = useState(null);
+  const [porClase, setPorClase] = useState(null);
+  const [porNaturaleza, setPorNaturaleza] = useState(null);
+  const [total, setTotal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getEstadisticas(), getDepartamentos()])
-      .then(([statsRes, deptosRes]) => {
+    Promise.all([
+      getEstadisticasPorDepto(),
+      getEstadisticasPorClase(),
+      getEstadisticasPorNaturaleza(),
+      getTotalPrestadores(),
+    ])
+      .then(([deptoRes, claseRes, natRes, totalRes]) => {
         if (cancelled) return;
-        setStats(statsRes);
-        setDeptos(deptosRes);
+        setPorDepto(deptoRes);
+        setPorClase(claseRes);
+        setPorNaturaleza(natRes);
+        setTotal(totalRes);
       })
       .catch((err) => {
         if (!cancelled) setError(err.message);
@@ -41,31 +50,27 @@ export default function Dashboard() {
   if (loading) return <div className="pt-24"><Loader text="Cargando estadísticas…" /></div>;
   if (error) return <div className="pt-24 px-4"><ErrorMessage message={error} /></div>;
 
-  const data = stats?.data || [];
-  const totalRegistros = data.reduce((s, d) => s + d.total_registros, 0);
-  const promedioGlobal = data.length
-    ? (data.reduce((s, d) => s + (d.promedio_mm || 0), 0) / data.length).toFixed(1)
-    : '—';
-  const maxDepto = data.reduce((m, d) => ((d.max_mm || 0) > (m.max_mm || 0) ? d : m), data[0] || {});
-  const totalDeptos = deptos?.departamentos?.length || data.length;
+  const totalDeptos = porDepto?.length || 0;
+  const topDepto = porDepto?.[0] || {};
+  const totalClases = porClase?.length || 0;
 
   // Charts data
-  const barData = [...data]
-    .sort((a, b) => (b.promedio_mm || 0) - (a.promedio_mm || 0))
+  const barData = (porDepto || [])
     .slice(0, 15)
     .map((d) => ({
-      name: d.departamento || 'Sin dato',
-      promedio: Number((d.promedio_mm || 0).toFixed(1)),
-      max: Number((d.max_mm || 0).toFixed(1)),
+      name: d.depa_nombre || 'Sin dato',
+      total: Number(d.total),
     }));
 
-  const pieData = [...data]
-    .sort((a, b) => b.total_registros - a.total_registros)
-    .slice(0, 8)
-    .map((d) => ({
-      name: d.departamento || 'Sin dato',
-      value: d.total_registros,
-    }));
+  const pieData = (porNaturaleza || []).map((d) => ({
+    name: d.naju_nombre || 'Sin dato',
+    value: Number(d.total),
+  }));
+
+  const claseBarData = (porClase || []).map((d) => ({
+    name: d.clpr_nombre || 'Sin dato',
+    total: Number(d.total),
+  }));
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
@@ -74,7 +79,7 @@ export default function Dashboard() {
         <p className="mb-1 text-sm font-medium text-white">{label}</p>
         {payload.map((p) => (
           <p key={p.dataKey} className="text-xs text-surface-300">
-            {p.dataKey === 'promedio' ? 'Promedio' : 'Máximo'}: {p.value} mm
+            Prestadores: {Number(p.value).toLocaleString()}
           </p>
         ))}
       </div>
@@ -88,21 +93,21 @@ export default function Dashboard() {
         <div className="mb-10">
           <h1 className="text-3xl font-bold text-white">Dashboard</h1>
           <p className="mt-2 text-surface-400">
-            Estadísticas agregadas de precipitaciones por departamento.
+            Estadísticas del Registro Especial de Prestadores de Servicios de Salud (REPS).
           </p>
         </div>
 
         {/* Stats cards */}
         <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard icon={Droplets} label="Total registros" value={totalRegistros.toLocaleString()} />
-          <StatCard icon={BarChart3} label="Promedio general" value={`${promedioGlobal} mm`} />
-          <StatCard
-            icon={TrendingUp}
-            label="Máximo registrado"
-            value={`${(maxDepto.max_mm || 0).toFixed(1)} mm`}
-            sub={maxDepto.departamento}
-          />
+          <StatCard icon={Building2} label="Total prestadores" value={total?.toLocaleString() || '—'} />
           <StatCard icon={MapPin} label="Departamentos" value={totalDeptos} />
+          <StatCard
+            icon={BarChart3}
+            label="Mayor concentración"
+            value={Number(topDepto.total || 0).toLocaleString()}
+            sub={topDepto.depa_nombre}
+          />
+          <StatCard icon={Scale} label="Clases de prestador" value={totalClases} />
         </div>
 
         {/* Charts */}
@@ -110,7 +115,7 @@ export default function Dashboard() {
           {/* Bar chart */}
           <div className="rounded-xl border border-surface-800 bg-surface-900/50 p-6 lg:col-span-2">
             <h3 className="mb-6 text-lg font-semibold text-white">
-              Precipitación promedio por departamento (Top 15)
+              Prestadores por departamento (Top 15)
             </h3>
             <div className="h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -124,15 +129,15 @@ export default function Dashboard() {
                     width={120}
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="promedio" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Promedio (mm)" />
+                  <Bar dataKey="total" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Prestadores" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Pie chart */}
+          {/* Pie chart - naturaleza */}
           <div className="rounded-xl border border-surface-800 bg-surface-900/50 p-6">
-            <h3 className="mb-6 text-lg font-semibold text-white">Registros por departamento</h3>
+            <h3 className="mb-6 text-lg font-semibold text-white">Naturaleza jurídica</h3>
             <div className="h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -168,6 +173,28 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Clase bar chart */}
+        <div className="mt-6 rounded-xl border border-surface-800 bg-surface-900/50 p-6">
+          <h3 className="mb-6 text-lg font-semibold text-white">Distribución por clase de prestador</h3>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={claseBarData} margin={{ left: 20, right: 20, bottom: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fill: '#94a3b8', fontSize: 10 }}
+                  angle={-35}
+                  textAnchor="end"
+                  interval={0}
+                />
+                <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="total" fill="#60a5fa" radius={[4, 4, 0, 0]} name="Prestadores" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
         {/* Table */}
         <div className="mt-6 rounded-xl border border-surface-800 bg-surface-900/50 p-6">
           <h3 className="mb-6 text-lg font-semibold text-white">Resumen por departamento</h3>
@@ -175,30 +202,20 @@ export default function Dashboard() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-surface-800 text-surface-400">
+                  <th className="px-4 py-3 font-medium">#</th>
                   <th className="px-4 py-3 font-medium">Departamento</th>
-                  <th className="px-4 py-3 font-medium text-right">Registros</th>
-                  <th className="px-4 py-3 font-medium text-right">Promedio (mm)</th>
-                  <th className="px-4 py-3 font-medium text-right">Máx (mm)</th>
-                  <th className="px-4 py-3 font-medium text-right">Mín (mm)</th>
+                  <th className="px-4 py-3 font-medium text-right">Prestadores</th>
                 </tr>
               </thead>
               <tbody>
-                {data.map((d, i) => (
+                {(porDepto || []).map((d, i) => (
                   <tr
                     key={i}
                     className="border-b border-surface-800/50 transition-colors hover:bg-surface-800/30"
                   >
-                    <td className="px-4 py-3 font-medium text-white">{d.departamento || '—'}</td>
-                    <td className="px-4 py-3 text-right text-surface-300">{d.total_registros}</td>
-                    <td className="px-4 py-3 text-right text-surface-300">
-                      {d.promedio_mm != null ? d.promedio_mm.toFixed(1) : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right text-primary-400">
-                      {d.max_mm != null ? d.max_mm.toFixed(1) : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right text-surface-300">
-                      {d.min_mm != null ? d.min_mm.toFixed(1) : '—'}
-                    </td>
+                    <td className="px-4 py-3 text-surface-500">{i + 1}</td>
+                    <td className="px-4 py-3 font-medium text-white">{d.depa_nombre || '—'}</td>
+                    <td className="px-4 py-3 text-right text-primary-400">{Number(d.total).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>

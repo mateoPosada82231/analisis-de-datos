@@ -1,4 +1,4 @@
-import { CloudRain } from 'lucide-react';
+import { Hospital } from 'lucide-react';
 
 export default function Footer() {
   return (
@@ -8,11 +8,11 @@ export default function Footer() {
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2 text-white">
-              <CloudRain className="h-5 w-5 text-primary-400" />
-              <span className="font-semibold">PrecipitacionesAPI</span>
+              <Hospital className="h-5 w-5 text-primary-400" />
+              <span className="font-semibold">SaludREPS</span>
             </div>
             <p className="mt-3 text-sm text-surface-400">
-              API REST para datos de precipitaciones del portal de datos abiertos del gobierno colombiano.
+              Consulta de Prestadores de Servicios de Salud del portal de datos abiertos del gobierno colombiano.
             </p>
           </div>
 
@@ -22,7 +22,7 @@ export default function Footer() {
             <ul className="space-y-2 text-sm text-surface-400">
               <li><a href="/dashboard" className="no-underline text-surface-400 hover:text-white transition-colors">Dashboard</a></li>
               <li><a href="/explorador" className="no-underline text-surface-400 hover:text-white transition-colors">Explorador</a></li>
-              <li><a href="/api/docs" target="_blank" rel="noopener noreferrer" className="no-underline text-surface-400 hover:text-white transition-colors">API Docs</a></li>
+              <li><a href="/docs" className="no-underline text-surface-400 hover:text-white transition-colors">Documentación</a></li>
             </ul>
           </div>
 
@@ -30,7 +30,7 @@ export default function Footer() {
             <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-surface-300">Recursos</h4>
             <ul className="space-y-2 text-sm text-surface-400">
               <li><a href="https://www.datos.gov.co" target="_blank" rel="noopener noreferrer" className="no-underline text-surface-400 hover:text-white transition-colors">Datos.gov.co</a></li>
-              <li><a href="https://www.datos.gov.co/Ambiente-y-Desarrollo-Sostenible/Precipitaciones/ksew-j3zj" target="_blank" rel="noopener noreferrer" className="no-underline text-surface-400 hover:text-white transition-colors">Dataset Original</a></li>
+              <li><a href="https://www.datos.gov.co/Salud-y-Protecci-n-Social/Prestadores-de-Servicios-de-Salud/ugc5-acjp" target="_blank" rel="noopener noreferrer" className="no-underline text-surface-400 hover:text-white transition-colors">Dataset Original</a></li>
             </ul>
           </div>
 

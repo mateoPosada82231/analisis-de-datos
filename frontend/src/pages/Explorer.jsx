@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Search, Filter, ChevronLeft, ChevronRight, X } from 'lucide-react';
-import { getPrecipitaciones, getDepartamentos } from '../services/api';
+import { getPrestadores, getDepartamentos } from '../services/api';
 import Loader from '../components/Loader';
 import ErrorMessage from '../components/ErrorMessage';
 
@@ -14,8 +14,8 @@ export default function Explorer() {
   const [filters, setFilters] = useState({
     departamento: '',
     municipio: '',
-    fecha_inicio: '',
-    fecha_fin: '',
+    nombre: '',
+    naturaleza: '',
     limit: 25,
     offset: 0,
   });
@@ -25,11 +25,11 @@ export default function Explorer() {
     setError(null);
     try {
       const [data, deptosRes] = await Promise.all([
-        getPrecipitaciones(params),
-        deptos.length ? Promise.resolve({ departamentos: deptos }) : getDepartamentos(),
+        getPrestadores(params),
+        deptos.length ? Promise.resolve(deptos) : getDepartamentos(),
       ]);
       setRecords(data);
-      if (!deptos.length) setDeptos(deptosRes.departamentos || []);
+      if (!deptos.length) setDeptos(deptosRes);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -49,7 +49,7 @@ export default function Explorer() {
   };
 
   const handleClear = () => {
-    const cleared = { departamento: '', municipio: '', fecha_inicio: '', fecha_fin: '', limit: 25, offset: 0 };
+    const cleared = { departamento: '', municipio: '', nombre: '', naturaleza: '', limit: 25, offset: 0 };
     setFilters(cleared);
     fetchData(cleared);
   };
@@ -64,7 +64,7 @@ export default function Explorer() {
   const currentPage = Math.floor(filters.offset / filters.limit) + 1;
   const totalPages = records ? Math.ceil(records.total / filters.limit) : 0;
 
-  const hasActiveFilters = filters.departamento || filters.municipio || filters.fecha_inicio || filters.fecha_fin;
+  const hasActiveFilters = filters.departamento || filters.municipio || filters.nombre || filters.naturaleza;
 
   return (
     <div className="pt-24 pb-16">
@@ -72,12 +72,12 @@ export default function Explorer() {
         {/* Header */}
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white">Explorador de Datos</h1>
+            <h1 className="text-3xl font-bold text-white">Explorador de Prestadores</h1>
             <p className="mt-2 text-surface-400">
-              Busca y filtra registros de precipitaciones.
+              Busca y filtra prestadores de servicios de salud.
               {records && (
                 <span className="ml-1 text-primary-400">
-                  {records.total.toLocaleString()} registros encontrados
+                  {records.total.toLocaleString()} prestadores encontrados
                 </span>
               )}
             </p>
@@ -130,26 +130,31 @@ export default function Explorer() {
                 />
               </div>
 
-              {/* Fecha inicio */}
+              {/* Nombre prestador */}
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-surface-400">Fecha desde</label>
+                <label className="mb-1.5 block text-xs font-medium text-surface-400">Nombre prestador</label>
                 <input
-                  type="date"
-                  value={filters.fecha_inicio}
-                  onChange={(e) => setFilters({ ...filters, fecha_inicio: e.target.value })}
-                  className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2.5 text-sm text-white outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                  type="text"
+                  value={filters.nombre}
+                  onChange={(e) => setFilters({ ...filters, nombre: e.target.value })}
+                  placeholder="Buscar prestador…"
+                  className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2.5 text-sm text-white placeholder:text-surface-500 outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                 />
               </div>
 
-              {/* Fecha fin */}
+              {/* Naturaleza */}
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-surface-400">Fecha hasta</label>
-                <input
-                  type="date"
-                  value={filters.fecha_fin}
-                  onChange={(e) => setFilters({ ...filters, fecha_fin: e.target.value })}
+                <label className="mb-1.5 block text-xs font-medium text-surface-400">Naturaleza jurídica</label>
+                <select
+                  value={filters.naturaleza}
+                  onChange={(e) => setFilters({ ...filters, naturaleza: e.target.value })}
                   className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2.5 text-sm text-white outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                />
+                >
+                  <option value="">Todas</option>
+                  <option value="Pública">Pública</option>
+                  <option value="Privada">Privada</option>
+                  <option value="Mixta">Mixta</option>
+                </select>
               </div>
             </div>
 
@@ -188,19 +193,15 @@ export default function Explorer() {
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-surface-800 bg-surface-900/80">
-                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">ID</th>
-                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">Estación</th>
+                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">Código</th>
+                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">Prestador</th>
                       <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">Departamento</th>
                       <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">Municipio</th>
-                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">Fecha</th>
-                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400 text-right">
-                        Valor (mm)
-                      </th>
-                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400 text-right">
-                        Latitud
-                      </th>
-                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400 text-right">
-                        Longitud
+                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">Clase</th>
+                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">Naturaleza</th>
+                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">Nivel</th>
+                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400 text-center">
+                        Habilitado
                       </th>
                     </tr>
                   </thead>
@@ -208,32 +209,28 @@ export default function Explorer() {
                     {records.data.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="px-4 py-12 text-center text-surface-500">
-                          No se encontraron registros con los filtros aplicados.
+                          No se encontraron prestadores con los filtros aplicados.
                         </td>
                       </tr>
                     ) : (
-                      records.data.map((r) => (
+                      records.data.map((r, i) => (
                         <tr
-                          key={r.id}
+                          key={r.codigo_habilitacion || i}
                           className="border-b border-surface-800/50 transition-colors hover:bg-surface-800/30"
                         >
-                          <td className="whitespace-nowrap px-4 py-3 text-surface-500">{r.id}</td>
-                          <td className="max-w-[200px] truncate px-4 py-3 text-white" title={r.nombre_estacion}>
-                            {r.nombre_estacion || '—'}
+                          <td className="whitespace-nowrap px-4 py-3 text-surface-500">{r.codigo_habilitacion || '—'}</td>
+                          <td className="max-w-[250px] truncate px-4 py-3 text-white" title={r.nombre_prestador}>
+                            {r.nombre_prestador || '—'}
                           </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-surface-300">{r.departamento || '—'}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-surface-300">{r.municipio || '—'}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-surface-300">
-                            {r.fecha ? r.fecha.split('T')[0] : '—'}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-primary-400">
-                            {r.valor_mm != null ? r.valor_mm : '—'}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right text-surface-400">
-                            {r.latitud != null ? Number(r.latitud).toFixed(4) : '—'}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right text-surface-400">
-                            {r.longitud != null ? Number(r.longitud).toFixed(4) : '—'}
+                          <td className="whitespace-nowrap px-4 py-3 text-surface-300">{r.depa_nombre || '—'}</td>
+                          <td className="whitespace-nowrap px-4 py-3 text-surface-300">{r.muni_nombre || '—'}</td>
+                          <td className="whitespace-nowrap px-4 py-3 text-surface-300">{r.clpr_nombre || '—'}</td>
+                          <td className="whitespace-nowrap px-4 py-3 text-surface-300">{r.naju_nombre || '—'}</td>
+                          <td className="whitespace-nowrap px-4 py-3 text-center text-surface-300">{r.nivel || '—'}</td>
+                          <td className="whitespace-nowrap px-4 py-3 text-center">
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${r.habilitado === 'SI' ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
+                              {r.habilitado || '—'}
+                            </span>
                           </td>
                         </tr>
                       ))
@@ -248,7 +245,7 @@ export default function Explorer() {
               <div className="mt-4 flex flex-col items-center justify-between gap-4 sm:flex-row">
                 <p className="text-sm text-surface-500">
                   Mostrando {filters.offset + 1}–{Math.min(filters.offset + filters.limit, records.total)}{' '}
-                  de {records.total.toLocaleString()} registros
+                  de {records.total.toLocaleString()} prestadores
                 </p>
                 <div className="flex items-center gap-2">
                   <button
