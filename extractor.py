@@ -1,7 +1,7 @@
 """
 extractor.py
 Fetches IPS (Instituciones Prestadoras de Salud) data from datos.gov.co
-(dataset ugc5-acjp), processes it with pandas, and stores the results in MySQL.
+(dataset ugc5-acjp), processes it with pandas, and stores the results in PostgreSQL.
 
 Usage:
     python extractor.py [--truncate]
@@ -55,9 +55,29 @@ def fetch_data(url: str = config.API_URL, limit: int = config.API_LIMIT) -> list
     Download up to *limit* records from the Socrata-based API.
     Raises an exception if the HTTP request fails.
     """
-    response = requests.get(url, params={"$limit": limit}, timeout=config.API_TIMEOUT)
-    response.raise_for_status()
-    return response.json()
+    urls_to_try = [url]
+    if "www.datos.gov.co" in url:
+        urls_to_try.append(url.replace("www.datos.gov.co", "datos.gov.co"))
+    elif "datos.gov.co" in url:
+        urls_to_try.append(url.replace("datos.gov.co", "www.datos.gov.co"))
+
+    last_exc = None
+    for current_url in urls_to_try:
+        try:
+            response = requests.get(
+                current_url,
+                params={"$limit": limit},
+                timeout=config.API_TIMEOUT,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as exc:
+            last_exc = exc
+
+    raise RuntimeError(
+        "No fue posible descargar datos de datos.gov.co. "
+        "Verifica conexión a internet/DNS e intenta nuevamente."
+    ) from last_exc
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +148,7 @@ def run(truncate: bool = False):
     2. Fetch raw data from the government API.
     3. Process with pandas.
     4. Optionally truncate existing rows.
-    5. Insert into MySQL.
+    5. Insert into PostgreSQL.
     """
     print("=== API-gobierno – Extractor de IPS Habilitadas ===")
 
@@ -151,7 +171,7 @@ def run(truncate: bool = False):
     db_records = build_db_records(df)
 
     # -- Store ------------------------------------------------------------
-    print("[4/4] Almacenando datos en MySQL …")
+    print("[4/4] Almacenando datos en PostgreSQL …")
     if truncate:
         database.truncate_table(conn)
         print("      Filas anteriores eliminadas (truncate=True).")

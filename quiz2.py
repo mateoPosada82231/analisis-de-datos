@@ -34,7 +34,6 @@ TIMEOUT = 30
 
 UMBRAL_BAJO = 50_000_000
 UMBRAL_MEDIO = 200_000_000
-UMBRAL_ALTO_ESPECIAL = 1_000_000_000
 
 
 # ---------------------------------------------------------------------------
@@ -163,41 +162,9 @@ def mostrar_resultados(contratos: list[dict]) -> None:
         n = sum(1 for c in contratos if c["categoria_estado"] == estado)
         print(f"   {' ' + estado:<22}: {n:>6}")
 
-    # 6. Contratos con valor 0
+    # 6. Contratos con valor 0 (fallos de conversión o dato ausente)
     con_valor_cero = sum(1 for c in contratos if c["valor_total_adjudicacion"] == 0)
     print(f"\n6. Contratos con valor = 0        : {con_valor_cero}")
-
-    # 7. Contratos con valor > 1.000.000.000
-    grandes = [c for c in contratos if c["valor_total_adjudicacion"] > UMBRAL_ALTO_ESPECIAL]
-    print(f"\n7. Contratos con valor > $1.000.000.000 ({len(grandes)} encontrados):")
-    if grandes:
-        print(f"   {'#':<5} {'Valor':>20}  {'Proveedor'}")
-        print(f"   {sep_minor}")
-        for i, c in enumerate(grandes, 1):
-            proveedor = c["nombre_del_proveedor"][:50]
-            entidad = c["entidad"][:40]
-            print(f"   {i:<5} ${c['valor_total_adjudicacion']:>19,.2f}  {proveedor}")
-            print(f"         Entidad: {entidad}")
-            print(f"         Estado : {c['estado_del_procedimiento']}")
-    else:
-        print("   (ninguno)")
-
-    # 8. Contratos con valor > 200.000.000 y estado ≠ "Adjudicado"
-    no_adj_altos = [
-        c for c in contratos
-        if c["valor_total_adjudicacion"] > UMBRAL_MEDIO
-        and c["categoria_estado"] != "Adjudicado"
-    ]
-    print(f"\n8. Contratos con valor > $200.000.000 y estado ≠ Adjudicado ({len(no_adj_altos)} encontrados):")
-    if no_adj_altos:
-        print(f"   {'#':<5} {'Valor':>20}  {'Estado':<25} {'Proveedor'}")
-        print(f"   {sep_minor}")
-        for i, c in enumerate(no_adj_altos, 1):
-            proveedor = c["nombre_del_proveedor"][:40]
-            estado = c["estado_del_procedimiento"][:24]
-            print(f"   {i:<5} ${c['valor_total_adjudicacion']:>19,.2f}  {estado:<25} {proveedor}")
-    else:
-        print("   (ninguno)")
 
     print(f"\n{sep}\n")
 

@@ -1,51 +1,55 @@
-import { Link } from 'react-router-dom';
-import { Hospital, Database, BarChart3, Search, ArrowRight, Zap, Shield, Globe } from 'lucide-react';
+import { Link } from "react-router-dom";
+import {
+  FileBarChart2,
+  Database,
+  BarChart3,
+  Search,
+  ArrowRight,
+  Zap,
+  Shield,
+  Globe,
+} from "lucide-react";
 
 const features = [
   {
     icon: Database,
-    title: 'Datos Abiertos',
-    desc: 'Accede al registro de prestadores de servicios de salud (REPS) del portal datos.gov.co.',
+    title: "Datos Abiertos",
+    desc: "Accede a 2000 contratos públicos desde datos.gov.co (equipo 2, offset 2000).",
   },
   {
     icon: Zap,
-    title: 'Consulta Directa',
-    desc: 'Conecta directamente con la API Socrata de datos.gov.co con filtros y paginación.',
+    title: "Consulta Directa",
+    desc: "Conecta directamente con la API Socrata de datos.gov.co con filtros y paginación.",
   },
   {
     icon: BarChart3,
-    title: 'Estadísticas en Tiempo Real',
-    desc: 'Visualiza distribución de prestadores por departamento, clase y naturaleza jurídica.',
+    title: "Estadísticas en Tiempo Real",
+    desc: "Visualiza suma total, promedio, categorías por valor y categorías por estado.",
   },
   {
     icon: Search,
-    title: 'Explorador de Datos',
-    desc: 'Busca y filtra prestadores por departamento, municipio, nombre y naturaleza.',
+    title: "Explorador de Datos",
+    desc: "Filtra por entidad, proveedor, estado, categoría de valor y rango monetario.",
   },
   {
     icon: Shield,
-    title: 'Datos Confiables',
-    desc: 'Información verificada del Registro Especial de Prestadores de Servicios de Salud (REPS).',
+    title: "Datos Confiables",
+    desc: "Información abierta del gobierno procesada con reglas de limpieza del quiz.",
   },
   {
     icon: Globe,
-    title: 'Cobertura Nacional',
-    desc: 'Prestadores habilitados en todos los departamentos y municipios de Colombia.',
+    title: "Cobertura Nacional",
+    desc: "Contratos de múltiples entidades públicas de Colombia en una sola vista.",
   },
 ];
 
-const codeExample = `// Consultar prestadores por departamento
+const codeExample = `// Consultar contratos del Quiz 2
 const response = await fetch(
-  'https://www.datos.gov.co/resource/ugc5-acjp.json'
-  + '?$where=depa_nombre=\\'ANTIOQUIA\\'&$limit=10'
+  'https://www.datos.gov.co/resource/p6dx-8zbt.json'
+  + '?$limit=2000&$offset=2000'
 );
 const data = await response.json();
-
-// Obtener estadísticas por departamento
-const stats = await fetch(
-  'https://www.datos.gov.co/resource/ugc5-acjp.json'
-  + '?$select=depa_nombre,count(*)&$group=depa_nombre'
-);`;
+`;
 
 export default function Home() {
   return (
@@ -62,20 +66,21 @@ export default function Home() {
           <div className="mx-auto max-w-3xl text-center">
             {/* Badge */}
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary-500/20 bg-primary-500/10 px-4 py-1.5 text-sm text-primary-300">
-              <Hospital className="h-4 w-4" />
+              <FileBarChart2 className="h-4 w-4" />
               Datos Abiertos de Colombia
             </div>
 
             <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl">
-              Prestadores de{' '}
+              Contratos de{" "}
               <span className="bg-gradient-to-r from-primary-400 to-primary-200 bg-clip-text text-transparent">
-                Salud
+                Gobierno
               </span>
             </h1>
 
             <p className="mx-auto mt-6 max-w-2xl text-lg text-surface-400 sm:text-xl">
-              Consulta, filtra y visualiza el Registro Especial de Prestadores de Servicios de Salud
-              (REPS) del portal de datos abiertos del gobierno colombiano.
+              Consulta, filtra y visualiza los contratos del Quiz 2 con métricas
+              obligatorias, clasificación por valor y estado, y exploración
+              detallada.
             </p>
 
             {/* CTAs */}
@@ -103,7 +108,9 @@ export default function Home() {
                 <div className="h-3 w-3 rounded-full bg-surface-700" />
                 <div className="h-3 w-3 rounded-full bg-surface-700" />
                 <div className="h-3 w-3 rounded-full bg-surface-700" />
-                <span className="ml-2 text-xs text-surface-500">ejemplo.js</span>
+                <span className="ml-2 text-xs text-surface-500">
+                  ejemplo.js
+                </span>
               </div>
               <pre className="overflow-x-auto p-5 text-sm leading-relaxed text-surface-300">
                 <code>{codeExample}</code>
@@ -118,10 +125,11 @@ export default function Home() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold text-white sm:text-4xl">
-              Todo lo que necesitas para explorar prestadores de salud
+              Todo lo que necesitas para resolver el Quiz 2
             </h2>
             <p className="mt-4 text-lg text-surface-400">
-              Consulta directa al REPS con filtros, paginación, estadísticas y visualización.
+              Consulta directa a datos.gov.co con filtros, paginación,
+              estadísticas y visualización.
             </p>
           </div>
 
@@ -135,7 +143,9 @@ export default function Home() {
                   <f.icon className="h-5 w-5 text-primary-400" />
                 </div>
                 <h3 className="text-lg font-semibold text-white">{f.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-surface-400">{f.desc}</p>
+                <p className="mt-2 text-sm leading-relaxed text-surface-400">
+                  {f.desc}
+                </p>
               </div>
             ))}
           </div>
@@ -146,18 +156,36 @@ export default function Home() {
       <section className="border-t border-surface-800 py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-bold text-white sm:text-4xl">Endpoints disponibles</h2>
+            <h2 className="text-3xl font-bold text-white sm:text-4xl">
+              Endpoints disponibles
+            </h2>
             <p className="mt-4 text-lg text-surface-400">
-              API REST estándar con respuestas JSON limpias y documentación Swagger integrada.
+              Endpoint del dataset con los parámetros exactos del quiz.
             </p>
           </div>
 
           <div className="mx-auto mt-12 max-w-3xl space-y-4">
             {[
-              { method: 'GET', path: '?$limit=25&$offset=0', desc: 'Consultar prestadores con paginación' },
-              { method: 'GET', path: '?$where=depa_nombre=\'...\'' , desc: 'Filtrar por departamento' },
-              { method: 'GET', path: '?$select=...&$group=...', desc: 'Estadísticas agregadas' },
-              { method: 'GET', path: '?$select=depa_nombre&$group=depa_nombre', desc: 'Departamentos únicos' },
+              {
+                method: "GET",
+                path: "/resource/p6dx-8zbt.json?$limit=2000&$offset=2000",
+                desc: "Consulta base del Quiz 2",
+              },
+              {
+                method: "DATA",
+                path: "entidad, nombre_del_proveedor, valor_total_adjudicacion, estado_del_procedimiento",
+                desc: "Campos requeridos",
+              },
+              {
+                method: "RULE",
+                path: "valor no convertible = 0",
+                desc: "Regla de normalización",
+              },
+              {
+                method: "RULE",
+                path: "Bajo / Medio / Alto + Adjudicado / No adjudicado / Otro",
+                desc: "Clasificaciones del quiz",
+              },
             ].map((ep) => (
               <div
                 key={ep.path}
@@ -166,8 +194,12 @@ export default function Home() {
                 <span className="inline-flex w-fit rounded-md bg-primary-600/15 px-2.5 py-1 text-xs font-bold text-primary-300">
                   {ep.method}
                 </span>
-                <code className="text-sm font-medium text-white">{ep.path}</code>
-                <span className="text-sm text-surface-400 sm:ml-auto">{ep.desc}</span>
+                <code className="text-sm font-medium text-white">
+                  {ep.path}
+                </code>
+                <span className="text-sm text-surface-400 sm:ml-auto">
+                  {ep.desc}
+                </span>
               </div>
             ))}
           </div>
@@ -181,7 +213,8 @@ export default function Home() {
             Comienza a explorar los datos
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-lg text-surface-400">
-            Visualiza estadísticas, filtra prestadores y descubre la distribución de servicios de salud en Colombia.
+            Visualiza estadísticas, filtra contratos y revisa todos los
+            resultados requeridos por el taller.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link

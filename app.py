@@ -1,6 +1,6 @@
 """
 app.py
-FastAPI REST API that exposes IPS Habilitadas data stored in MySQL.
+FastAPI REST API that exposes IPS Habilitadas data stored in PostgreSQL.
 
 Interactive docs are available at:
     http://localhost:5000/docs   (Swagger UI)

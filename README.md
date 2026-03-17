@@ -1,55 +1,105 @@
 # API-gobierno
 
+Proyecto de analisis de datos con:
 
-Estos son los pasos para correr el proyecto en otro PC:
+1. `quiz2.py` para procesar 2000 contratos del dataset asignado.
+2. Backend FastAPI con PostgreSQL para exponer datos de IPS.
+3. Frontend React + Vite para dashboard y exploracion.
 
-### 1. Clonar el repositorio
+## 1. Requisitos
+
+1. Python 3.11+
+2. PostgreSQL 14+
+3. Node.js 18+
+
+## 2. Clonar el proyecto
+
 ```bash
 git clone https://github.com/andres-lopez-g/API-gobierno.git
 cd API-gobierno
 ```
 
-### 2. Backend (Python + MySQL)
+## 3. Configuracion de base de datos (PostgreSQL)
 
-**Requisitos previos:** Python 3 y MySQL instalados.
+Credenciales por defecto usadas en `config.py`:
+
+1. Base de datos: `api_gobierno`
+2. Usuario: `postgres`
+3. Clave: `admin`
+4. Host: `localhost`
+5. Puerto: `5432`
+
+Crear la base:
 
 ```bash
-# Crear la base de datos en MySQL
-mysql -u root -e "CREATE DATABASE IF NOT EXISTS gobierno_db"
+psql -U postgres -h localhost -c "CREATE DATABASE api_gobierno"
+```
 
-# Instalar dependencias de Python
+Si necesitas ajustar credenciales, puedes usar variables de entorno (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`) o editar `config.py`.
+
+## 4. Instalar dependencias de Python
+
+```bash
 pip install -r requirements.txt
+```
 
-# Cargar datos desde datos.gov.co a la base de datos
-python extractor.py
+## 5. Cargar datos en PostgreSQL
 
-# Iniciar la API (corre en http://localhost:5000)
+```bash
+python extractor.py --truncate
+```
+
+Este comando:
+
+1. Crea base y tabla si no existen.
+2. Descarga datos del dataset IPS (`ugc5-acjp`).
+3. Inserta registros en `api_gobierno.ips`.
+
+## 6. Levantar API backend
+
+```bash
 python app.py
 ```
 
-> Si tu MySQL tiene contraseña, editá config.py y poné tu password en `DB_PASSWORD`.
+Endpoints:
 
-### 3. Frontend (React + Vite)
+1. `http://localhost:5000/health`
+2. `http://localhost:5000/docs`
 
-**Requisito previo:** Node.js instalado.
+## 7. Levantar frontend
 
 ```bash
-cd frontend
-
-# Instalar dependencias
-npm install
-
-# Iniciar el servidor de desarrollo (corre en http://localhost:5173)
-npm run dev
+npm --prefix frontend install
+npm --prefix frontend run dev
 ```
 
-### Resumen rápido
+Frontend en:
 
-| Paso | Comando |
-|---|---|
-| Clonar | `git clone https://github.com/andres-lopez-g/API-gobierno.git` |
-| Deps backend | `pip install -r requirements.txt` |
-| Cargar datos | `python extractor.py` |
-| Iniciar API | `python app.py` |
-| Deps frontend | `cd frontend && npm install` |
-| Iniciar frontend | `npm run dev` |
+1. `http://localhost:5173`
+
+## 8. Ejecutar Quiz 2
+
+```bash
+python quiz2.py
+```
+
+Nota: el comando correcto incluye extension `.py`.
+
+## 9. Problemas comunes
+
+1. Error `python: can't open file 'quiz2'`: ejecuta `python quiz2.py`.
+2. Error de DNS con `datos.gov.co`: verifica internet/DNS y reintenta `python extractor.py --truncate`.
+3. Error autenticacion PostgreSQL: revisa usuario/clave (`postgres` / `admin`) y que el servicio este activo.
+4. Frontend 404 en `localhost:5173`: asegúrate de correr `npm --prefix frontend run dev`.
+
+## Resumen rapido
+
+```bash
+pip install -r requirements.txt
+psql -U postgres -h localhost -c "CREATE DATABASE api_gobierno"
+python extractor.py --truncate
+python app.py
+npm --prefix frontend install
+npm --prefix frontend run dev
+python quiz2.py
+```

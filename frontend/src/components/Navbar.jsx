@@ -1,12 +1,12 @@
-import { Link, useLocation } from 'react-router-dom';
-import { Hospital, Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { Link, useLocation } from "react-router-dom";
+import { FileBarChart2, Menu, X } from "lucide-react";
+import { useState } from "react";
 
 const links = [
-  { to: '/', label: 'Inicio' },
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/explorador', label: 'Explorador' },
-  { to: '/docs', label: 'Docs' },
+  { to: "/", label: "Inicio" },
+  { to: "/dashboard", label: "Dashboard" },
+  { to: "/explorador", label: "Explorador" },
+  { to: "/docs", label: "Docs" },
 ];
 
 export default function Navbar() {
@@ -17,9 +17,12 @@ export default function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-surface-800 bg-surface-950/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2 text-lg font-semibold text-white no-underline">
-          <Hospital className="h-6 w-6 text-primary-400" />
-          <span>SaludREPS</span>
+        <Link
+          to="/"
+          className="flex items-center gap-2 text-lg font-semibold text-white no-underline"
+        >
+          <FileBarChart2 className="h-6 w-6 text-primary-400" />
+          <span>Quiz2 Contratos</span>
         </Link>
 
         {/* Desktop links */}
@@ -30,8 +33,8 @@ export default function Navbar() {
               to={link.to}
               className={`rounded-lg px-3 py-2 text-sm font-medium no-underline transition-colors ${
                 pathname === link.to
-                  ? 'bg-surface-800 text-white'
-                  : 'text-surface-400 hover:bg-surface-800/50 hover:text-white'
+                  ? "bg-surface-800 text-white"
+                  : "text-surface-400 hover:bg-surface-800/50 hover:text-white"
               }`}
             >
               {link.label}
@@ -69,8 +72,8 @@ export default function Navbar() {
               onClick={() => setOpen(false)}
               className={`block rounded-lg px-3 py-2 text-sm font-medium no-underline ${
                 pathname === link.to
-                  ? 'bg-surface-800 text-white'
-                  : 'text-surface-400 hover:text-white'
+                  ? "bg-surface-800 text-white"
+                  : "text-surface-400 hover:text-white"
               }`}
             >
               {link.label}

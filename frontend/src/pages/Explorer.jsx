@@ -1,70 +1,96 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Search, Filter, ChevronLeft, ChevronRight, X } from 'lucide-react';
-import { getPrestadores, getDepartamentos } from '../services/api';
-import Loader from '../components/Loader';
-import ErrorMessage from '../components/ErrorMessage';
+import { useState, useEffect, useCallback } from "react";
+import { Search, Filter, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { getQuizContracts, applyQuizFilters } from "../services/api";
+import Loader from "../components/Loader";
+import ErrorMessage from "../components/ErrorMessage";
 
 export default function Explorer() {
-  const [records, setRecords] = useState(null);
-  const [deptos, setDeptos] = useState([]);
+  const [allContracts, setAllContracts] = useState([]);
+  const [filteredContracts, setFilteredContracts] = useState([]);
+  const [estadoOptions, setEstadoOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
 
   const [filters, setFilters] = useState({
-    departamento: '',
-    municipio: '',
-    nombre: '',
-    naturaleza: '',
+    entidad: "",
+    proveedor: "",
+    categoriaEstado: "",
+    estadoOriginal: "",
+    categoriaValor: "",
+    minValor: "",
+    maxValor: "",
     limit: 25,
     offset: 0,
   });
 
-  const fetchData = useCallback(async (params) => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [data, deptosRes] = await Promise.all([
-        getPrestadores(params),
-        deptos.length ? Promise.resolve(deptos) : getDepartamentos(),
-      ]);
-      setRecords(data);
-      if (!deptos.length) setDeptos(deptosRes);
+      const data = await getQuizContracts();
+      setAllContracts(data);
+      setFilteredContracts(data);
+      setEstadoOptions(
+        [...new Set(data.map((item) => item.estado_del_procedimiento))]
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b)),
+      );
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [deptos.length]);
+  }, []);
 
   useEffect(() => {
-    fetchData(filters);
+    fetchData();
   }, []);
 
   const handleSearch = (e) => {
     e.preventDefault();
-    const newFilters = { ...filters, offset: 0 };
-    setFilters(newFilters);
-    fetchData(newFilters);
+    const updated = { ...filters, offset: 0 };
+    setFilters(updated);
+    setFilteredContracts(applyQuizFilters(allContracts, updated));
   };
 
   const handleClear = () => {
-    const cleared = { departamento: '', municipio: '', nombre: '', naturaleza: '', limit: 25, offset: 0 };
+    const cleared = {
+      entidad: "",
+      proveedor: "",
+      categoriaEstado: "",
+      estadoOriginal: "",
+      categoriaValor: "",
+      minValor: "",
+      maxValor: "",
+      limit: 25,
+      offset: 0,
+    };
     setFilters(cleared);
-    fetchData(cleared);
+    setFilteredContracts(allContracts);
   };
 
   const goToPage = (newOffset) => {
-    const updated = { ...filters, offset: newOffset };
-    setFilters(updated);
-    fetchData(updated);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setFilters((prev) => ({ ...prev, offset: newOffset }));
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const total = filteredContracts.length;
   const currentPage = Math.floor(filters.offset / filters.limit) + 1;
-  const totalPages = records ? Math.ceil(records.total / filters.limit) : 0;
+  const totalPages = Math.max(1, Math.ceil(total / filters.limit));
+  const visibleContracts = filteredContracts.slice(
+    filters.offset,
+    filters.offset + filters.limit,
+  );
 
-  const hasActiveFilters = filters.departamento || filters.municipio || filters.nombre || filters.naturaleza;
+  const hasActiveFilters =
+    filters.entidad ||
+    filters.proveedor ||
+    filters.categoriaEstado ||
+    filters.estadoOriginal ||
+    filters.categoriaValor ||
+    filters.minValor ||
+    filters.maxValor;
 
   return (
     <div className="pt-24 pb-16">
@@ -72,12 +98,14 @@ export default function Explorer() {
         {/* Header */}
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white">Explorador de Prestadores</h1>
+            <h1 className="text-3xl font-bold text-white">
+              Explorador de Contratos
+            </h1>
             <p className="mt-2 text-surface-400">
-              Busca y filtra prestadores de servicios de salud.
-              {records && (
+              Busca y filtra los 2000 registros procesados para el quiz.
+              {!loading && (
                 <span className="ml-1 text-primary-400">
-                  {records.total.toLocaleString()} prestadores encontrados
+                  {total.toLocaleString()} contratos encontrados
                 </span>
               )}
             </p>
@@ -103,58 +131,129 @@ export default function Explorer() {
             className="mb-6 rounded-xl border border-surface-800 bg-surface-900/50 p-6"
           >
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {/* Departamento */}
+              {/* Entidad */}
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-surface-400">Departamento</label>
+                <label className="mb-1.5 block text-xs font-medium text-surface-400">
+                  Entidad
+                </label>
+                <input
+                  type="text"
+                  value={filters.entidad}
+                  onChange={(e) =>
+                    setFilters({ ...filters, entidad: e.target.value })
+                  }
+                  placeholder="Ej: Alcaldía, Ministerio..."
+                  className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2.5 text-sm text-white placeholder:text-surface-500 outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                />
+              </div>
+
+              {/* Proveedor */}
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-surface-400">
+                  Proveedor
+                </label>
+                <input
+                  type="text"
+                  value={filters.proveedor}
+                  onChange={(e) =>
+                    setFilters({ ...filters, proveedor: e.target.value })
+                  }
+                  placeholder="Nombre del proveedor..."
+                  className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2.5 text-sm text-white placeholder:text-surface-500 outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                />
+              </div>
+
+              {/* Estado */}
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-surface-400">
+                  Estado (categoría)
+                </label>
                 <select
-                  value={filters.departamento}
-                  onChange={(e) => setFilters({ ...filters, departamento: e.target.value })}
+                  value={filters.categoriaEstado}
+                  onChange={(e) =>
+                    setFilters({ ...filters, categoriaEstado: e.target.value })
+                  }
+                  className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2.5 text-sm text-white placeholder:text-surface-500 outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                >
+                  <option value="">Todos</option>
+                  <option value="Adjudicado">Adjudicado</option>
+                  <option value="No adjudicado">No adjudicado</option>
+                  <option value="Otro estado">Otro estado</option>
+                </select>
+              </div>
+
+              {/* Categoría valor */}
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-surface-400">
+                  Categoría de valor
+                </label>
+                <select
+                  value={filters.categoriaValor}
+                  onChange={(e) =>
+                    setFilters({ ...filters, categoriaValor: e.target.value })
+                  }
+                  className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2.5 text-sm text-white outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                >
+                  <option value="">Todas</option>
+                  <option value="Bajo">Bajo</option>
+                  <option value="Medio">Medio</option>
+                  <option value="Alto">Alto</option>
+                </select>
+              </div>
+
+              {/* Estado original */}
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-surface-400">
+                  Estado original
+                </label>
+                <select
+                  value={filters.estadoOriginal}
+                  onChange={(e) =>
+                    setFilters({ ...filters, estadoOriginal: e.target.value })
+                  }
                   className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2.5 text-sm text-white outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                 >
                   <option value="">Todos</option>
-                  {deptos.map((d) => (
-                    <option key={d} value={d}>{d}</option>
+                  {estadoOptions.map((estado) => (
+                    <option key={estado} value={estado}>
+                      {estado}
+                    </option>
                   ))}
                 </select>
               </div>
 
-              {/* Municipio */}
+              {/* Mínimo */}
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-surface-400">Municipio</label>
+                <label className="mb-1.5 block text-xs font-medium text-surface-400">
+                  Valor mínimo
+                </label>
                 <input
-                  type="text"
-                  value={filters.municipio}
-                  onChange={(e) => setFilters({ ...filters, municipio: e.target.value })}
-                  placeholder="Buscar municipio…"
+                  type="number"
+                  min="0"
+                  value={filters.minValor}
+                  onChange={(e) =>
+                    setFilters({ ...filters, minValor: e.target.value })
+                  }
+                  placeholder="0"
                   className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2.5 text-sm text-white placeholder:text-surface-500 outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                 />
               </div>
 
-              {/* Nombre prestador */}
+              {/* Máximo */}
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-surface-400">Nombre prestador</label>
+                <label className="mb-1.5 block text-xs font-medium text-surface-400">
+                  Valor máximo
+                </label>
                 <input
-                  type="text"
-                  value={filters.nombre}
-                  onChange={(e) => setFilters({ ...filters, nombre: e.target.value })}
-                  placeholder="Buscar prestador…"
+                  type="number"
+                  min="0"
+                  value={filters.maxValor}
+                  onChange={(e) =>
+                    setFilters({ ...filters, maxValor: e.target.value })
+                  }
+                  placeholder="Sin límite"
                   className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2.5 text-sm text-white placeholder:text-surface-500 outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                 />
-              </div>
-
-              {/* Naturaleza */}
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-surface-400">Naturaleza jurídica</label>
-                <select
-                  value={filters.naturaleza}
-                  onChange={(e) => setFilters({ ...filters, naturaleza: e.target.value })}
-                  className="w-full rounded-lg border border-surface-700 bg-surface-800 px-3 py-2.5 text-sm text-white outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                >
-                  <option value="">Todas</option>
-                  <option value="Pública">Pública</option>
-                  <option value="Privada">Privada</option>
-                  <option value="Mixta">Mixta</option>
-                </select>
               </div>
             </div>
 
@@ -193,44 +292,75 @@ export default function Explorer() {
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-surface-800 bg-surface-900/80">
-                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">Código</th>
-                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">Prestador</th>
-                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">Departamento</th>
-                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">Municipio</th>
-                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">Clase</th>
-                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">Naturaleza</th>
-                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">Nivel</th>
-                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400 text-center">
-                        Habilitado
+                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">
+                        Código
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">
+                        Entidad
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">
+                        Proveedor
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">
+                        Estado original
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">
+                        Cat. estado
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3 font-medium text-surface-400">
+                        Cat. valor
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3 font-medium text-right text-surface-400">
+                        Valor
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {records.data.length === 0 ? (
+                    {visibleContracts.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-12 text-center text-surface-500">
-                          No se encontraron prestadores con los filtros aplicados.
+                        <td
+                          colSpan={7}
+                          className="px-4 py-12 text-center text-surface-500"
+                        >
+                          No se encontraron contratos con los filtros aplicados.
                         </td>
                       </tr>
                     ) : (
-                      records.data.map((r, i) => (
+                      visibleContracts.map((r, i) => (
                         <tr
-                          key={r.codigo_habilitacion || i}
+                          key={`${r.entidad}-${r.nombre_del_proveedor}-${filters.offset + i}`}
                           className="border-b border-surface-800/50 transition-colors hover:bg-surface-800/30"
                         >
-                          <td className="whitespace-nowrap px-4 py-3 text-surface-500">{r.codigo_habilitacion || '—'}</td>
-                          <td className="max-w-[250px] truncate px-4 py-3 text-white" title={r.nombre_prestador}>
-                            {r.nombre_prestador || '—'}
+                          <td className="whitespace-nowrap px-4 py-3 text-surface-500">
+                            {filters.offset + i + 1}
                           </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-surface-300">{r.depa_nombre || '—'}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-surface-300">{r.muni_nombre || '—'}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-surface-300">{r.clpr_nombre || '—'}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-surface-300">{r.naju_nombre || '—'}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-center text-surface-300">{r.nivel || '—'}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-center">
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${r.habilitado === 'SI' ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
-                              {r.habilitado || '—'}
-                            </span>
+                          <td
+                            className="max-w-[280px] truncate px-4 py-3 text-white"
+                            title={r.entidad}
+                          >
+                            {r.entidad}
+                          </td>
+                          <td
+                            className="max-w-[240px] truncate px-4 py-3 text-surface-300"
+                            title={r.nombre_del_proveedor}
+                          >
+                            {r.nombre_del_proveedor}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-surface-300">
+                            {r.estado_del_procedimiento}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-surface-300">
+                            {r.categoria_estado}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-surface-300">
+                            {r.categoria_valor}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-right text-primary-400">
+                            $
+                            {r.valor_total_adjudicacion.toLocaleString(
+                              undefined,
+                              { maximumFractionDigits: 2 },
+                            )}
                           </td>
                         </tr>
                       ))
@@ -244,12 +374,15 @@ export default function Explorer() {
             {totalPages > 1 && (
               <div className="mt-4 flex flex-col items-center justify-between gap-4 sm:flex-row">
                 <p className="text-sm text-surface-500">
-                  Mostrando {filters.offset + 1}–{Math.min(filters.offset + filters.limit, records.total)}{' '}
-                  de {records.total.toLocaleString()} prestadores
+                  Mostrando {filters.offset + 1}–
+                  {Math.min(filters.offset + filters.limit, total)} de{" "}
+                  {total.toLocaleString()} contratos
                 </p>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => goToPage(Math.max(0, filters.offset - filters.limit))}
+                    onClick={() =>
+                      goToPage(Math.max(0, filters.offset - filters.limit))
+                    }
                     disabled={filters.offset === 0}
                     className="inline-flex items-center gap-1 rounded-lg border border-surface-700 px-3 py-2 text-sm text-surface-400 transition-colors hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
                   >
@@ -261,7 +394,7 @@ export default function Explorer() {
                   </span>
                   <button
                     onClick={() => goToPage(filters.offset + filters.limit)}
-                    disabled={filters.offset + filters.limit >= records.total}
+                    disabled={filters.offset + filters.limit >= total}
                     className="inline-flex items-center gap-1 rounded-lg border border-surface-700 px-3 py-2 text-sm text-surface-400 transition-colors hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     Siguiente
